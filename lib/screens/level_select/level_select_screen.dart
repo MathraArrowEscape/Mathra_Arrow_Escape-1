@@ -1,0 +1,197 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/app_colors.dart';
+import '../../core/app_themes.dart';
+import '../../core/audio_haptic_helper.dart';
+import '../../main.dart';
+import '../game/game_screen.dart';
+
+class LevelSelectScreen extends ConsumerWidget {
+  const LevelSelectScreen({super.key});
+
+  static int _calculateTotalVisible(int highestUnlocked) {
+    return highestUnlocked + 10;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final progress = ref.watch(progressRepositoryProvider);
+    final themeColors = AppThemes.getThemeColors(progress.selectedTheme);
+    final totalVisible = _calculateTotalVisible(progress.highestUnlockedLevel);
+
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(gradient: themeColors.bgGradient),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Stack(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Icon(Icons.arrow_back_ios_new_rounded,
+                              color: themeColors.textPrimary, size: 20),
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Text('Levels',
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: themeColors.textPrimary)),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: GridView.builder(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.85,
+                  ),
+                  itemCount: totalVisible,
+                  itemBuilder: (context, index) {
+                    final levelNum = index + 1;
+                    final isUnlocked = progress.isLevelUnlocked(levelNum);
+                    final isCompleted = progress.isLevelCompleted(levelNum);
+                    final isCurrentLevel = levelNum == progress.currentLevel;
+
+                    return _LevelCell(
+                      levelNumber: levelNum,
+                      isUnlocked: isUnlocked,
+                      isCompleted: isCompleted,
+                      isCurrentLevel: isCurrentLevel,
+                      themeColors: themeColors,
+                      onTap: isUnlocked
+                          ? () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => GameScreen(level: levelNum),
+                                ),
+                              );
+                            }
+                          : null,
+                    )
+                        .animate(
+                            delay: Duration(milliseconds: (index % 20) * 20))
+                        .fadeIn(duration: 200.ms)
+                        .scale(
+                            begin: const Offset(0.7, 0.7),
+                            end: const Offset(1, 1));
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LevelCell extends StatelessWidget {
+  final int levelNumber;
+  final bool isUnlocked;
+  final bool isCompleted;
+  final bool isCurrentLevel;
+  final ThemeColors themeColors;
+  final VoidCallback? onTap;
+
+  const _LevelCell({
+    required this.levelNumber,
+    required this.isUnlocked,
+    required this.isCompleted,
+    required this.isCurrentLevel,
+    required this.themeColors,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color bgColor;
+    Color borderColor;
+    Color shadowColor;
+    Color textColor;
+
+    if (isCurrentLevel) {
+      bgColor = themeColors.surface;
+      borderColor = themeColors.accentColor;
+      shadowColor = themeColors.accentDark;
+      textColor = themeColors.accentColor;
+    } else if (isCompleted) {
+      bgColor = themeColors.accentColor;
+      borderColor = themeColors.accentColor;
+      shadowColor = themeColors.accentDark;
+      textColor = const Color(0xFF101114);
+    } else if (isUnlocked) {
+      bgColor = themeColors.surface;
+      borderColor = themeColors.accentColor.withValues(alpha: 0.25);
+      shadowColor = themeColors.surface.withValues(alpha: 0.8);
+      textColor = themeColors.textPrimary;
+    } else {
+      bgColor = themeColors.surface.withValues(alpha: 0.4);
+      borderColor = Colors.transparent;
+      shadowColor = Colors.transparent;
+      textColor = themeColors.textMuted;
+    }
+
+    return GestureDetector(
+      onTap: () {
+        if (onTap != null) {
+          AudioHapticHelper.playClick();
+          onTap!();
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(10),
+          border:
+              isUnlocked ? Border.all(color: borderColor, width: 1.5) : null,
+          boxShadow: isUnlocked
+              ? [
+                  BoxShadow(
+                    color: shadowColor,
+                    offset: const Offset(0, 3),
+                    blurRadius: 0,
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (!isUnlocked)
+              const Icon(Icons.lock_outline_rounded,
+                  color: AppColors.textMuted, size: 20)
+            else
+              Text(
+                '$levelNumber',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: textColor,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
